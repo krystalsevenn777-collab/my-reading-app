@@ -27,7 +27,7 @@
             <a href="阅读项目列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
                 <i class="fa-regular fa-folder w-5"></i><span class="font-medium text-sm">阅读项目</span>
             </a>
-            </nav>
+        </nav>
     </aside>
 
     <main class="flex-1 overflow-y-auto">
@@ -43,7 +43,7 @@
                 <div class="space-y-6">
                     <div class="space-y-3">
                         <label class="text-sm font-bold text-slate-700">项目图标与颜色</label>
-                        <div class="flex gap-3" id="colorPicker">
+                        <div class="flex gap-3">
                             <button class="color-btn color-btn-active w-12 h-12 rounded-xl border-2 border-slate-100 bg-white text-slate-300 flex items-center justify-center transition-all" data-color="blue" onclick="selectColor(this)">
                                 <i class="fa-solid fa-book-open"></i>
                             </button>
@@ -86,39 +86,32 @@
 
     <script type="module">
         import { supabase } from './supabase-config.js';
-        window.supabase = supabase; // 暴露给全局以支持 onclick 调用
+        window.supabase = supabase;
 
         let selectedColorName = 'blue';
 
-        // 全局颜色选择函数
         window.selectColor = function(btn) {
             document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('color-btn-active'));
             btn.classList.add('color-btn-active');
             selectedColorName = btn.getAttribute('data-color');
         };
 
-        // 全局移除书籍函数
         window.removeBook = function(bookId) {
             const el = document.querySelector(`[data-book-id="${bookId}"]`);
-            if (el) {
-                el.style.opacity = '0';
-                setTimeout(() => el.remove(), 300);
-            }
+            if (el) el.remove();
         };
 
-        // 加载选中的书籍
         document.addEventListener('DOMContentLoaded', () => {
             const rawData = localStorage.getItem('temp_selected_books');
             if (rawData) {
                 const importedBooks = JSON.parse(rawData);
                 const container = document.getElementById('selectedBooks');
                 const addBtn = container.querySelector('button'); 
-
                 importedBooks.forEach(book => {
                     const html = `
-                        <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm group transition-all" data-book-id="${book.id}">
+                        <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm group" data-book-id="${book.id}">
                             <div class="w-10 h-14 bg-slate-200 rounded shadow-sm overflow-hidden flex-shrink-0">
-                                <img src="${book.cover_url}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/100x140?text=No+Cover'">
+                                <img src="${book.cover_url}" class="w-full h-full object-cover">
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-bold text-slate-800 truncate">${book.title}</p>
@@ -134,37 +127,32 @@
             }
         });
 
-        // --- 核心提交函数 ---
+        // 核心修复：函数内部直接、同步地获取所有必要变量
         window.createAndReturn = async function() {
             const submitBtn = document.getElementById('submitBtn');
-            const titleInput = document.getElementById('projectTitle');
-            const descInput = document.getElementById('projectDesc');
-
-            // 1. 获取输入值
-            const project_name = titleInput.value.trim();
-            const description = descInput.value.trim();
+            const project_name = document.getElementById('projectTitle').value.trim();
+            const description = document.getElementById('projectDesc').value.trim();
 
             if (!project_name) {
-                alert('项目名称是必填的哦');
+                alert('项目名称是必填的');
                 return;
             }
 
             try {
-                // 2. 获取当前用户（这是修复 ReferenceError 的关键处）
+                // 第一步：获取当前用户并保存到局部变量 user
                 const { data: authData, error: authError } = await window.supabase.auth.getUser();
-                const user = authData?.user; // 明确定义 user 变量
-
-                if (authError || !user) {
-                    alert("登录状态已失效，请重新登录");
+                
+                if (authError || !authData.user) {
+                    alert("登录失效，请重新登录");
                     window.location.href = 'login.html';
                     return;
                 }
 
-                // 3. 准备 UI 状态
+                const user = authData.user; // 明确定义局部变量 user
                 submitBtn.disabled = true;
-                submitBtn.innerText = "正在保存...";
+                submitBtn.innerText = "保存中...";
 
-                // 4. 插入项目记录
+                // 第二步：插入项目
                 const { data: pData, error: pErr } = await window.supabase
                     .from('projects')
                     .insert([{
@@ -172,13 +160,13 @@
                         description: description,
                         status: '进行中',
                         cover_url: `https://via.placeholder.com/150/${selectedColorName}`,
-                        user_id: user.id // 现在 user 已经安全定义了
+                        user_id: user.id  // 此处使用上面刚刚定义的 user
                     }])
                     .select();
 
                 if (pErr) throw pErr;
 
-                // 5. 处理书籍关联（如果有）
+                // 第三步：处理书籍关联
                 const bookEls = document.querySelectorAll('#selectedBooks [data-book-id]');
                 if (bookEls.length > 0) {
                     const booksData = Array.from(bookEls).map(el => ({
@@ -197,24 +185,16 @@
                     await window.supabase.from('project_books').insert(relations);
                 }
 
-                showToast('项目创建成功！');
-                setTimeout(() => window.location.href = '阅读项目列表页.html', 1000);
+                alert('创建成功！');
+                window.location.href = '阅读项目列表页.html';
 
             } catch (err) {
-                console.error("保存失败详情:", err);
-                alert('保存失败: ' + (err.message || '未知错误'));
+                console.error(err);
+                alert('失败: ' + err.message);
                 submitBtn.disabled = false;
                 submitBtn.innerText = "创建并返回";
             }
         };
-
-        function showToast(message) {
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2';
-            toast.innerHTML = `<i class="fa-solid fa-check-circle"></i><span>${message}</span>`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2500);
-        }
     </script>
 </body>
 </html>
