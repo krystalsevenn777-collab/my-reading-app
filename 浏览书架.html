@@ -41,6 +41,15 @@
                 </div>
             </div>
         </div>
+        <div id="progressContainer" class="hidden mt-4">
+            <div class="flex justify-between mb-1">
+                <span id="progressText" class="text-[10px] font-bold text-blue-600">准备中...</span>
+                <span id="progressPercent" class="text-[10px] font-bold text-blue-600">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div id="progressInner" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
         <div class="flex gap-3 mt-8">
             <button onclick="closeModal()" class="flex-1 py-3 text-sm font-bold text-slate-400 hover:bg-slate-50 rounded-xl">取消</button>
             <button id="uploadBtn" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">开始解析</button>
@@ -117,6 +126,7 @@
     
         let allBooks = [];
         let selectedIds = [];
+
     
         const urlParams = new URLSearchParams(window.location.search);
         const isSelectMode = urlParams.get('mode') === 'select';
@@ -181,7 +191,17 @@
             grid.innerHTML = booksHtml + addBtnHtml;
         }
         
-    
+        function updateUploadProgress(percent, text) {
+        const container = document.getElementById('progressContainer');
+        const inner = document.getElementById('progressInner');
+        const textEl = document.getElementById('progressText');
+        const percentEl = document.getElementById('progressPercent');
+
+        container.classList.remove('hidden');
+        inner.style.width = percent + '%';
+        if (text) textEl.innerText = text;
+        percentEl.innerText = Math.round(percent) + '%';
+    }
         // --- 交互逻辑 ---
         window.handleBookClick = function(id) {
             if (isSelectMode) {
@@ -337,50 +357,80 @@
             if (!title || !file) return alert("请完整填写信息");
             
             const btn = document.getElementById('uploadBtn');
-            btn.disabled = true; btn.innerText = "正在解析并存入数据库...";
+            btn.disabled = true;
+            btn.innerText = "上传中..."; 
+            btn.classList.add('bg-slate-400', 'cursor-not-allowed'); // 增加视觉反馈 btn.innerText = "正在解析并存入数据库...";
     
             try {
                 const bookId = 'book_' + Date.now();
                 let pagesData = [];
                 const ext = file.name.split('.').pop().toLowerCase();
-    
-                // 1. 根据类型解析内容
-                // 1. 根据类型解析内容
+                // 1. 开始解析阶段
+                updateUploadProgress(5, "正在初始化解析器...");
+
                 if (ext === 'pdf') {
-                    pagesData = await parsePDF(file, bookId); // 传入 bookId 用于文件命名
+                    // 注意：如果你想在 parsePDF 内部显示更细的进度，
+                    // 需要把 updateUploadProgress 传入 parsePDF 函数，这里简单处理
+                    pagesData = await parsePDF(file, bookId); 
                 } else if (ext === 'txt') {
                     pagesData = await parseTXT(file);
                 } else if (ext === 'epub') {
-                    // 新增：识别 epub 后缀
                     pagesData = await parseEPUB(file);
                 } else {
-                    throw new Error("目前支持 PDF, TXT 和 EPUB 格式");
-                }
-    
+                         throw new Error("目前支持 PDF, TXT 和 EPUB 格式");
+
+                updateUploadProgress(40, "解析完成，准备存入数据库...");
+
                 // 2. 存入书籍主表
                 const { error: err1 } = await supabase.from('books').insert([{
                     id: bookId,
                     title: title,
                     author: author,
                     total_pages: pagesData.length,
-                    cover_url: window.currentPdfCover || 'https://images.unsplash.com/photo-1543005139-059e15147552?w=400' ,
+                    cover_url: window.currentPdfCover || 'https://images.unsplash.com/photo-1543005139-059e15147552?w=400',
                     file_url: window.currentFileUrl
                 }]);
                 if (err1) throw err1;
-    
-                // 3. 分批存入内容表 (核心：确保 page_number 是数字)
-                for (let i = 0; i < pagesData.length; i += 50) {
-                    const batch = pagesData.slice(i, i + 50).map((text, index) => ({
+
+                // 3. 分批存入内容表 (这里是进度更新最明显的地方)
+                const batchSize = 50;
+                const totalBatches = Math.ceil(pagesData.length / batchSize);
+
+                for (let i = 0; i < pagesData.length; i += batchSize) {
+                    const currentBatchIndex = Math.floor(i / batchSize) + 1;
+                    const batch = pagesData.slice(i, i + batchSize).map((text, index) => ({
                         book_id: bookId,
-                        page_number: Number(i + index + 1), // 强制转换为整数数字
+                        page_number: Number(i + index + 1),
                         content: text
                     }));
+
                     const { error: err2 } = await supabase.from('book_contents').insert(batch);
                     if (err2) throw err2;
+
+                    // 计算进度：从 40% 到 95% 之间分配给数据库上传
+                    const dbProgress = 40 + (currentBatchIndex / totalBatches) * 55;
+                    updateUploadProgress(dbProgress, `正在同步数据 (第 ${currentBatchIndex}/${totalBatches} 组)...`);
                 }
+
+                updateUploadProgress(100, "全部完成！即将刷新...");
+
+                // 延迟一下让用户看到 100%
+                setTimeout(() => location.reload(), 800);
     
-                alert(`成功导入！共 ${pagesData.length} 页`);
-                location.reload();
+                // // 1. 根据类型解析内容
+                // // 1. 根据类型解析内容
+                // if (ext === 'pdf') {
+                //     pagesData = await parsePDF(file, bookId); // 传入 bookId 用于文件命名
+                // } else if (ext === 'txt') {
+                //     pagesData = await parseTXT(file);
+                // } else if (ext === 'epub') {
+                //     // 新增：识别 epub 后缀
+                //     pagesData = await parseEPUB(file);
+                // } else {
+                //     throw new Error("目前支持 PDF, TXT 和 EPUB 格式");
+                // }
+    
+               
             } catch (err) {
                 console.error(err);
                 alert("导入失败: " + err.message);
