@@ -180,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('项目名称是必填的哦');
                 return;
             }
+            
 
             // 禁用按钮防止重复点击
             submitBtn.disabled = true;
@@ -195,6 +196,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
 
             try {
+                // 1. 必须先获取当前用户！
+                const { data: { user }, error: authError } = await window.supabase.auth.getUser();
+
+                if (authError || !user) {
+                    alert("登录状态已失效，请重新登录");
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // 2. 获取表单数据 (根据你的实际 ID 修改)
+                const projectName = document.getElementById('projectName').value; 
+                const description = document.getElementById('description').value;
                 // 1. 插入项目
                 const { data: pData, error: pErr } = await supabase
                     .from('projects')
