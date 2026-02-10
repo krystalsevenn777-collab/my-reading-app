@@ -153,11 +153,11 @@ async function init() {
 }
 
 // --- 功能模块：加载最近阅读的书籍 ---
-async function loadLastReadBook() {
+async function loadLastReadBook(userId) {
     const { data: books, error } = await window.supabase
         .from('books')
         .select('*')
-        .eq('user_id',user.id)
+        .eq('user_id',userId)
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -197,13 +197,13 @@ async function loadLastReadBook() {
 }
 
 // --- 功能模块：加载阅读目标 ---
-async function loadGoals() {
+async function loadGoals(userId) {
     const list = document.getElementById('goalsList');
     
     const { data: goals, error } = await window.supabase
         .from('goals')
         .select('*')
-        .eq('user_id',user.id)
+        .eq('user_id',userId)
         .order('created_at', { ascending: false })
         .limit(3);
 
@@ -249,14 +249,14 @@ async function loadGoals() {
 }
 
 // --- 功能模块：加载最近笔记 ---
-async function loadRecentNotes() {
+async function loadRecentNotes(userId) {
     const container = document.getElementById('recentNotesContainer');
     
     // 1. 获取最新笔记
     const { data: notes, error: noteError } = await window.supabase
         .from('annotations')
         .select('*')
-        .eq('user_id',user.id)
+        .eq('user_id',userId)
         .order('created_at', { ascending: false })
         .limit(1);
 
