@@ -102,9 +102,9 @@
     async function fetchAndRenderGoals() {
         const listContainer = document.getElementById('goalsList');
         try {
-            const { data: { user } } = await window.supabase.auth.getUser();
+          const { data: { user } } = await window.supabase.auth.getUser();
             if (!user) return window.location.href = 'login.html';
-            document.getElementById('userNameDisplay').innerText = user.email.split('@')[0];
+           document.getElementById('userNameDisplay').innerText = user.email.split('@')[0];
 
             const { data: goals, error } = await window.supabase
                 .from('goals')

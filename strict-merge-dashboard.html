@@ -203,6 +203,7 @@ async function loadGoals() {
     const { data: goals, error } = await window.supabase
         .from('goals')
         .select('*')
+        .eq('userid',user.id)
         .order('created_at', { ascending: false })
         .limit(3);
 
@@ -255,6 +256,7 @@ async function loadRecentNotes() {
     const { data: notes, error: noteError } = await window.supabase
         .from('annotations')
         .select('*')
+        .eq('userid',user.id)
         .order('created_at', { ascending: false })
         .limit(1);
 
