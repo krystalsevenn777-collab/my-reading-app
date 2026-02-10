@@ -121,34 +121,53 @@
             document.getElementById('sendNoteBtn').addEventListener('click', saveNote);
         }
 
+        let pdfUrl = ""; // 新增一个全局变量存储链接
+
         async function loadBookMetadata() {
-            const { data } = await supabase.from('books').select('*').eq('id', bookId).single();
-            if (data) {
-                totalPages = data.total_pages || 0;
-                document.getElementById('totalPageDisplay').innerText = totalPages;
-            }
+        const { data } = await supabase.from('books').select('*').eq('id', bookId).single();
+        if (data) {
+            totalPages = data.total_pages || 0;
+            pdfUrl = data.file_url; // 👈 获取数据库里的 PDF 链接
+            document.getElementById('totalPageDisplay').innerText = totalPages || '1';
         }
+    }
 
-        async function loadPageContent() {
-            const contentArea = document.getElementById('selectableContent');
-            const { data } = await supabase.from('book_contents')
-                .select('content')
-                .eq('book_id', bookId)
-                .eq('page_number', currentPage)
-                .maybeSingle();
+    async function loadPageContent() {
+    const contentArea = document.getElementById('selectableContent');
+    
+    if (pdfUrl) {
+        // 使用 iframe 嵌入 PDF
+        // #page=${currentPage} 可以尝试让部分浏览器跳转到对应页码
+        contentArea.innerHTML = `
+            <iframe src="${pdfUrl}#page=${currentPage}" 
+                    style="width:100%; height:80vh; border:none;"
+                    allow="autoplay">
+            </iframe>
+        `;
+    } else {
+        // 如果没有文件链接，再尝试去查内容表
+        const { data } = await supabase.from('book_contents')
+            .select('content')
+            .eq('book_id', bookId)
+            .eq('page_number', currentPage)
+            .maybeSingle();
 
-            contentArea.innerHTML = data ? data.content : "暂无内容";
-            document.getElementById('curPageDisplay').innerText = currentPage;
+        contentArea.innerHTML = data ? data.content : `
+            <div class="flex flex-col items-center justify-center py-20">
+                <i class="fa-solid fa-file-circle-exclamation text-4xl text-slate-200 mb-4"></i>
+                <p class="text-slate-400">暂无 PDF 文件或文字内容</p>
+            </div>
+        `;
+    }
 
-            // 修正：确保进度条存在
-            if (totalPages > 0) {
-                const percent = Math.round((currentPage / totalPages) * 100);
-                const pBar = document.getElementById('progressBar');
-                if (pBar) pBar.style.width = percent + '%';
-                // 如果删除了 progressPercent ID，就不要再写对应的 innerText
-            }
-            refreshAnnotations();
-        }
+    document.getElementById('curPageDisplay').innerText = currentPage;
+    if (totalPages > 0) {
+        const percent = Math.round((currentPage / totalPages) * 100);
+        const pBar = document.getElementById('progressBar');
+        if (pBar) pBar.style.width = percent + '%';
+    }
+    refreshAnnotations();
+}
 
         window.changePage = (dir) => {
             const next = currentPage + dir;
