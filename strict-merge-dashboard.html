@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 个人读书仪表盘</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', "Microsoft YaHei", sans-serif;
+            background-color: #f8fafc;
+        }
+        .progress-bar-blue { background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%); }
+        .progress-bar-orange { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+        .progress-bar-red { background: linear-gradient(90deg, #ef4444 0%, #f87171 100%); }
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+    </style>
+    
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+        window.supabase = supabase;
+    </script>
+</head>
+<body class="flex min-h-screen text-slate-700">
+
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-solid fa-house"></i>
+                <span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读目标列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye"></i>
+                <span class="text-sm font-medium">阅读目标</span>
+            </a>
+            <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-regular fa-folder"></i>
+                <span class="text-sm">阅读项目</span>
+            </a>
+            <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="text-sm">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span class="text-sm">读书笔记</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-100 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="w-10 h-10 rounded-full bg-slate-100" alt="avatar" />
+            <div class="flex-1 overflow-hidden">
+                <div class="text-sm font-bold truncate" id="userNameDisplay">加载中...</div>
+                <div class="text-xs text-slate-400">阅读爱好者</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">个人读书仪表盘</h1>
+                <p class="text-sm text-slate-400 mt-1" id="dateDisplay">加载日期中...</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" placeholder="搜索书籍、笔记..." class="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64" />
+                </div>
+                <button class="p-2 text-slate-400 hover:bg-white rounded-full transition-colors"><i class="fa-regular fa-bell"></i></button>
+            </div>
+        </header>
+
+        <section class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold">目标跟进情况</h2>
+                <a href="阅读目标列表页.html" class="text-blue-500 text-sm font-medium flex items-center gap-1 hover:underline">
+                    查看全部 <i class="fa-solid fa-chevron-right text-xs"></i>
+                </a>
+            </div>
+            <div id="goalsList" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <p class="text-slate-400">同步中...</p>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div id="continueReadingContainer" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-between h-full min-h-[220px]">
+                <p class="text-slate-400 text-sm">加载阅读进度中...</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center h-full min-h-[220px]">
+                <div class="w-12 h-12 bg-blue-50 text-blue-200 rounded-full flex items-center justify-center mb-3 text-xl">
+                    <i class="fa-solid fa-plus"></i>
+                </div>
+                <h3 class="text-lg font-bold mb-1">开启一个新的阅读</h3>
+                <p class="text-xs text-slate-400 mb-5">开始探索新的书籍和知识</p>
+                <a href="浏览书架.html" class="px-10 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-100">选择书籍</a>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-1">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-bold">今日待办</h3>
+                    <span class="px-2 py-0.5 bg-blue-50 text-blue-500 text-[10px] rounded-full font-bold">待完善</span>
+                </div>
+                <div id="todoList" class="space-y-4">
+                    <div class="flex gap-3 group">
+                        <input type="checkbox" class="w-5 h-5 border-2 border-slate-200 rounded mt-0.5 cursor-pointer">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-slate-700">继续阅读当前书籍</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="recentNotesContainer" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 md:col-span-2">
+                <h3 class="font-bold mb-6">最近读书笔记</h3>
+                <p class="text-slate-400 text-sm">加载笔记中...</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+// 设置日期
+document.getElementById('dateDisplay').innerText = new Date().toLocaleDateString('zh-CN', { 
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' 
+});
+
+async function init() {
+    try {
+        // 1. 登录校验
+        const { data: { user }, error: authError } = await window.supabase.auth.getUser();
+        if (authError || !user) { window.location.href = 'login.html'; return; }
+        document.getElementById('userNameDisplay').innerText = user.email.split('@')[0];
+
+        // 2. 并行加载各个模块
+        await Promise.all([
+            loadLastReadBook(),
+            loadGoals(),
+            loadRecentNotes()
+        ]);
+    } catch (err) {
+        console.error("初始化页面失败:", err);
+    }
+}
+
+// --- 功能模块：加载最近阅读的书籍 ---
+async function loadLastReadBook() {
+    const { data: books, error } = await window.supabase
+        .from('books')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+    const container = document.getElementById('continueReadingContainer');
+    if (!error && books && books.length > 0) {
+        const book = books[0];
+        const progress = book.total_pages ? Math.round((book.last_position / book.total_pages) * 100) : 0;
+        
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-4 text-xs text-slate-400">
+                <h3 class="font-bold text-slate-800 text-base">继续阅读</h3>
+                <span><i class="fa-regular fa-clock"></i> 最近阅读：${new Date(book.updated_at).toLocaleDateString()}</span>
+            </div>
+            <div class="flex gap-6 items-center">
+                <div class="w-20 h-28 rounded-lg shadow-md overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                    <img src="${book.cover_url || 'https://via.placeholder.com/200x300'}" class="w-full h-full object-cover" />
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-lg font-bold mb-1 truncate">${book.title}</h4>
+                    <div class="flex justify-between text-[11px] mb-2 text-slate-400">
+                        <span>阅读进度</span>
+                        <span class="text-blue-500 font-medium">${book.last_position || 0} / ${book.total_pages || '?'} 页</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full mb-4">
+                        <div class="progress-bar-blue h-full rounded-full" style="width: ${progress}%"></div>
+                    </div>
+                    <button onclick="window.location.href='阅读详情页.html?id=${book.id}'" 
+                            class="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-all shadow-md shadow-blue-100">
+                        继续阅读
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `<p class="text-slate-400 text-sm">暂无阅读记录，快去书架挑一本吧！</p>`;
+    }
+}
+
+// --- 功能模块：加载阅读目标 ---
+async function loadGoals() {
+    const list = document.getElementById('goalsList');
+    
+    const { data: goals, error } = await window.supabase
+        .from('goals')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+    if (error || !goals || goals.length === 0) {
+        list.innerHTML = `<p class="text-slate-400">暂无目标，点击右侧“查看全部”去创建吧</p>`;
+        return;
+    }
+
+    list.innerHTML = goals.map((goal, i) => {
+        let barColor = 'progress-bar-blue';
+        if (goal.category === '季度目标') barColor = 'progress-bar-orange';
+        if (goal.category === '月度目标') barColor = 'progress-bar-red';
+        
+        const sigs = [10, 25, 40];
+
+        return `
+        <div onclick="window.location.href='阅读目标详情页.html?id=${goal.id}'" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 cursor-pointer hover:border-blue-300 transition-all">
+            <div class="flex justify-between items-start mb-4">
+                <h3 class="font-bold truncate pr-2">${goal.title}</h3>
+                <span class="text-blue-600 font-bold">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 h-2 rounded-full mb-6">
+                <div class="${barColor} h-full rounded-full" style="width: 5%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-slate-400 mb-4">
+                <div><p>已完成/总目标</p><p class="font-bold text-slate-800 mt-1">0/${goal.book_count} 本</p></div>
+                <div class="text-right"><p>预计完成</p><p class="font-bold text-slate-800 mt-1">${goal.deadline || '未设'}</p></div>
+            </div>
+            <div class="flex gap-2 mb-4">
+                <div class="w-10 h-14 bg-slate-200 rounded shadow-sm overflow-hidden opacity-80">
+                    <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=100&q=80&sig=${sigs[i % 3]}" class="w-full h-full object-cover" />
+                </div>
+                <div class="w-10 h-14 bg-slate-50 rounded border border-dashed border-slate-300"></div>
+                <div class="w-10 h-14 bg-slate-50 rounded border border-dashed border-slate-300"></div>
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-50 pt-4 text-xs">
+                <span class="text-emerald-500 font-medium flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-current"></span> 进行中</span>
+                <span class="text-slate-400">${goal.category}</span>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+// --- 功能模块：加载最近笔记 ---
+async function loadRecentNotes() {
+    const container = document.getElementById('recentNotesContainer');
+    
+    // 1. 获取最新笔记
+    const { data: notes, error: noteError } = await window.supabase
+        .from('annotations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    if (noteError) {
+        console.error("获取笔记失败:", noteError.message);
+        container.innerHTML = `<p class="text-slate-400 text-sm">笔记加载失败</p>`;
+        return;
+    }
+
+    if (notes && notes.length > 0) {
+        const note = notes[0];
+
+        // 2. 根据笔记获取书籍信息 (分步查询)
+        const { data: book, error: bookError } = await window.supabase
+            .from('books')
+            .select('title')
+            .eq('id', note.book_id)
+            .maybeSingle();
+
+        if (bookError) console.error("获取书籍信息失败:", bookError.message);
+
+        // 3. 渲染
+        container.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-bold">最近读书笔记</h3>
+                <button onclick="window.location.href='读书笔记列表页.html'" class="text-blue-500 text-sm font-medium flex items-center gap-1 hover:underline">
+                    查看详情 <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+            <div class="border-b border-slate-50 pb-5 mb-5">
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="font-bold text-slate-800">《${book?.title || '未知书籍'}》</h4>
+                    <span class="px-2 py-0.5 bg-blue-50 text-blue-500 text-[10px] rounded font-bold">${book?.category || '阅读'}</span>
+                </div>
+                <p class="text-sm text-slate-600 leading-relaxed line-clamp-2 mb-3">${note.content || '无内容'}</p>
+                <div class="text-[10px] text-slate-400 italic">记录于 ${new Date(note.created_at).toLocaleString()}</div>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <h3 class="font-bold mb-6">最近读书笔记</h3>
+            <p class="text-slate-400 text-sm">还没有笔记，开始阅读并记录吧！</p>
+        `;
+    }
+}
+
+window.onload = init;
+    </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简阅读 - 悦读模式</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        /* 核心去灰策略：深色背景衬托纯白纸张 */
+        body { 
+            display: flex; flex-direction: column; height: 100vh; 
+            background-color: #f1f3f5; /* 略深的底色 */
+            color: #1a202c; margin: 0;
+        }
+
+        header { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+
+        main { background-color: #f1f3f5; flex-1: 1; overflow-y: auto; }
+
+        /* 模拟真实纸张：高对比度阴影 */
+        #selectableContent { 
+            background: #ffffff !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 2px;
+            padding: 40px !important;
+            margin: 40px auto;
+            transition: all 0.3s ease;
+        }
+
+        #selectableContent img { 
+            width: 100%; border-radius: 2px;
+            /* 如果PDF还是模糊，取消下面这一行的注释 */
+            /* filter: contrast(1.05); */
+        }
+
+        aside { background: #ffffff; border-left: 1px solid #e2e8f0; }
+
+        /* 黑色药丸翻页器 */
+        .nav-pill {
+            background: #1a202c; color: white; border-radius: 99px;
+            padding: 4px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .note-card {
+            background: #ffffff; border: 1px solid #eef2f7;
+            border-left: 4px solid #3b82f6; border-radius: 8px;
+            padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+    </style>
+</head>
+<body>
+
+    <header class="h-16 flex items-center justify-between px-6 z-10">
+        <a href="浏览书架.html" class="flex items-center gap-2 text-slate-500 hover:text-blue-600 font-bold">
+            <i class="fa-solid fa-chevron-left text-xs"></i>
+            <span class="text-sm">返回书架</span>
+        </a>
+
+        <div class="nav-pill flex items-center gap-4">
+            <button onclick="changePage(-1)" class="px-3 py-1 hover:text-blue-400 font-bold text-xs">上一页</button>
+            <div class="flex flex-col items-center border-x border-slate-700 px-6 min-w-[80px]">
+                <span class="text-sm font-bold">
+                    <span id="curPageDisplay">1</span> / <span id="totalPageDisplay">-</span>
+                </span>
+                <div class="w-full h-0.5 bg-slate-700 mt-1 rounded-full overflow-hidden">
+                    <div id="progressBar" class="h-full bg-blue-500" style="width: 0%"></div>
+                </div>
+            </div>
+            <button onclick="changePage(1)" class="px-3 py-1 hover:text-blue-400 font-bold text-xs">下一页</button>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="flex bg-slate-100 p-1 rounded-xl">
+                <button onclick="adjustFontSize(1)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded-lg transition-all"><i class="fa-solid fa-plus text-xs"></i></button>
+                <button onclick="adjustFontSize(-1)" class="w-8 h-8 flex items-center justify-center hover:bg-white rounded-lg transition-all"><i class="fa-solid fa-minus text-xs"></i></button>
+            </div>
+            <button onclick="toggleTheme()" class="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-xl shadow-lg">
+                <i class="fa-solid fa-circle-half-stroke text-sm"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <main id="scrollContainer" class="flex-1 overflow-y-auto">
+            <article id="selectableContent" class="w-full max-w-4xl min-h-[90vh]">
+                正在努力加载内容...
+            </article>
+        </main>
+
+        <aside class="w-80 flex flex-col">
+            <div class="p-6 pt-8 font-black text-blue-600 tracking-tighter text-sm">读书笔记</div>
+            <div id="annotationList" class="flex-1 overflow-y-auto px-4"></div>
+            <div class="p-4 bg-slate-50 border-t border-slate-100">
+                <textarea id="noteInput" rows="3" class="w-full p-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 ring-blue-500/20" placeholder="记下这一刻的想法..."></textarea>
+                <button id="sendNoteBtn" class="w-full mt-2 bg-blue-600 text-white py-2 rounded-xl text-xs font-bold shadow-md">发送笔记</button>
+            </div>
+        </aside>
+    </div>
+
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const bookId = urlParams.get('id');
+        let currentPage = 1;
+        let totalPages = 0;
+        let currentZoom = 100;
+        let currentFontSize = 18;
+
+        async function init() {
+            if (!bookId) return;
+            const saved = localStorage.getItem(`progress_${bookId}`);
+            if (saved) currentPage = parseInt(saved);
+
+            await loadBookMetadata();
+            await loadPageContent();
+
+            document.getElementById('sendNoteBtn').addEventListener('click', saveNote);
+        }
+
+        async function loadBookMetadata() {
+            const { data } = await supabase.from('books').select('*').eq('id', bookId).single();
+            if (data) {
+                totalPages = data.total_pages || 0;
+                document.getElementById('totalPageDisplay').innerText = totalPages;
+            }
+        }
+
+        async function loadPageContent() {
+            const contentArea = document.getElementById('selectableContent');
+            const { data } = await supabase.from('book_contents')
+                .select('content')
+                .eq('book_id', bookId)
+                .eq('page_number', currentPage)
+                .maybeSingle();
+
+            contentArea.innerHTML = data ? data.content : "暂无内容";
+            document.getElementById('curPageDisplay').innerText = currentPage;
+
+            // 修正：确保进度条存在
+            if (totalPages > 0) {
+                const percent = Math.round((currentPage / totalPages) * 100);
+                const pBar = document.getElementById('progressBar');
+                if (pBar) pBar.style.width = percent + '%';
+                // 如果删除了 progressPercent ID，就不要再写对应的 innerText
+            }
+            refreshAnnotations();
+        }
+
+        window.changePage = (dir) => {
+            const next = currentPage + dir;
+            if (next >= 1 && (totalPages === 0 || next <= totalPages)) {
+                currentPage = next;
+                localStorage.setItem(`progress_${bookId}`, currentPage);
+                loadPageContent();
+                document.getElementById('scrollContainer').scrollTo(0,0);
+            }
+        };
+
+        window.adjustFontSize = (delta) => {
+            const contentArea = document.getElementById('selectableContent');
+            const img = contentArea.querySelector('img');
+            if (img) {
+                currentZoom += delta * 15;
+                img.style.width = currentZoom + '%';
+            } else {
+                currentFontSize += delta * 2;
+                contentArea.style.fontSize = currentFontSize + 'px';
+            }
+        };
+
+        async function saveNote() {
+            const input = document.getElementById('noteInput');
+            const content = input.value.trim();
+            if (!content) return;
+            await supabase.from('annotations').insert([{
+                book_id: bookId, page_number: currentPage, content: content
+            }]);
+            input.value = '';
+            refreshAnnotations();
+        }
+
+        async function refreshAnnotations() {
+            const { data } = await supabase.from('annotations').select('*').eq('book_id', bookId);
+            const list = document.getElementById('annotationList');
+            if (data) {
+                list.innerHTML = data.map(a => `
+                    <div class="note-card">
+                        <div class="text-[10px] font-bold text-blue-500 mb-1">第 ${a.page_number} 页</div>
+                        <p class="text-xs text-slate-600">${a.content}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 阅读目标详情</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+        window.supabase = supabase;
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', "Microsoft YaHei", sans-serif; background-color: #f8fafc; }
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+        .progress-bar-blue { background: #3b82f6; }
+        .progress-bar-emerald { background: #10b981; }
+        .progress-bar-amber { background: #f59e0b; }
+    </style>
+</head>
+<body class="flex min-h-screen text-slate-700">
+
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-house"></i>
+                <span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读目标列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye"></i>
+                <span class="font-medium text-sm">阅读目标</span>
+            </a>
+            <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-regular fa-folder"></i>
+                <span class="text-sm">阅读项目</span>
+            </a>
+            <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="text-sm">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span class="text-sm">读书笔记</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-slate-100">
+            <div class="flex items-center gap-3 px-2 py-3">
+                <div class="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 border border-slate-200">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-slate-800 truncate" id="userNameDisplay">加载中...</p>
+                    <button onclick="logout()" class="text-[10px] text-slate-400 hover:text-rose-500 font-medium transition-colors">退出登录</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto">
+        <div class="max-w-none mx-auto p-6 md:p-10 pb-24 md:pb-10">
+            
+            <header class="flex items-center gap-4 mb-8">
+                <a href="javascript:void(0)" onclick="handleBack()" class="w-9 h-9 border border-slate-200 rounded-lg flex items-center justify-center hover:bg-white transition-colors shadow-sm">
+                    <i class="fa-solid fa-arrow-left text-slate-400"></i>
+                </a>
+                <h1 class="text-2xl font-bold text-slate-900">阅读目标详情</h1>
+            </header>
+
+            <div id="goalContent" class="opacity-0 transition-opacity duration-500 space-y-6">
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div class="p-6 md:p-8">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 id="targetTitle" class="text-2xl font-bold text-slate-900 mb-2">---</h2>
+                                <div class="flex gap-2">
+                                    <span id="targetCategory" class="px-2.5 py-0.5 text-xs font-medium rounded-md">---</span>
+                                    <span class="px-2.5 py-0.5 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-md">综合类</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8 bg-slate-50/50 p-5 rounded-xl border border-slate-100">
+                            <div>
+                                <p class="text-xs text-slate-400 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-book text-[10px]"></i> 目标数量</p>
+                                <p id="targetBookCount" class="text-base font-bold text-slate-800">0 本书</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-check-circle text-[10px]"></i> 已完成</p>
+                                <p class="text-base font-bold text-slate-800">0 本书</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 mb-1.5 flex items-center gap-1"><i class="fa-solid fa-chart-line text-[10px]"></i> 当前达成率</p>
+                                <p id="targetRate" class="text-base font-extrabold text-blue-600">0%</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 mb-1.5 flex items-center gap-1"><i class="fa-regular fa-calendar text-[10px]"></i> 截止日期</p>
+                                <p id="targetDeadline" class="text-base font-bold text-slate-800">---</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 mb-6">
+                            <div class="flex justify-between items-end">
+                                <span class="text-xs font-semibold text-slate-500">总进度</span>
+                                <span id="progressText" class="text-xs font-bold text-blue-600">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                <div id="progressBar" class="progress-bar-blue h-full rounded-full transition-all duration-700" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between text-[11px] font-medium text-slate-400">
+                                <span id="startTimeDisplay">--- 开始</span>
+                                <span id="timeLeftDisplay" class="text-amber-500">正在计算...</span>
+                            </div>
+                        </div>
+
+                        <p id="targetDescription" class="text-sm text-slate-600 leading-relaxed border-t border-slate-50 pt-6">
+                            加载中...
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <i class="fa-regular fa-folder-open text-blue-500 text-sm"></i>
+                            <span class="text-sm">关联项目</span>
+                        </h3>
+                        <div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                            <h4 id="targetProjectName" class="font-bold text-slate-800 text-sm">未关联项目</h4>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                        <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-book text-blue-500 text-sm"></i>
+                            <span class="text-sm">目标书籍</span>
+                        </h3>
+                        <div class="text-center py-4 text-slate-400 text-xs italic">
+                            暂无书籍数据
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex justify-around p-3 md:hidden z-50">
+        <a href="strict-merge-dashboard.html" class="text-slate-400 flex flex-col items-center gap-1"><i class="fa-solid fa-house text-sm"></i><span class="text-[10px] font-medium">首页</span></a>
+        <a href="阅读目标列表页.html" class="text-blue-600 flex flex-col items-center gap-1"><i class="fa-solid fa-bullseye text-sm"></i><span class="text-[10px] font-medium">目标</span></a>
+        <a href="浏览书架.html" class="text-slate-400 flex flex-col items-center gap-1"><i class="fa-solid fa-book-open text-sm"></i><span class="text-[10px] font-medium">书架</span></a>
+        <a href="读书笔记列表页.html" class="text-slate-400 flex flex-col items-center gap-1"><i class="fa-solid fa-pen-to-square text-sm"></i><span class="text-[10px] font-medium">笔记</span></a>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const goalId = urlParams.get('id');
+
+        async function init() {
+            const { data: { user } } = await window.supabase.auth.getUser();
+            if (!user) return window.location.href = 'login.html';
+            document.getElementById('userNameDisplay').innerText = user.email.split('@')[0];
+
+            if (!goalId) return window.location.href = '阅读目标列表页.html';
+
+            try {
+                const { data: goal, error } = await window.supabase
+                    .from('goals').select('*').eq('id', goalId).single();
+                if (error) throw error;
+                renderPage(goal);
+            } catch (err) {
+                console.error(err);
+                alert('获取详情失败');
+            }
+        }
+
+        function renderPage(goal) {
+            document.getElementById('targetTitle').innerText = goal.title;
+            document.getElementById('targetBookCount').innerText = `${goal.book_count || 0} 本书`;
+            document.getElementById('targetDeadline').innerText = goal.deadline || '未设日期';
+            document.getElementById('targetDescription').innerText = goal.description || '暂无详细描述';
+            document.getElementById('targetProjectName').innerText = goal.project_name || '未关联项目';
+            
+            const createdDate = new Date(goal.created_at).toLocaleDateString();
+            document.getElementById('startTimeDisplay').innerText = `${createdDate} 开始`;
+
+            const catElem = document.getElementById('targetCategory');
+            catElem.innerText = goal.category;
+            
+            let barColor = 'progress-bar-blue', textColor = 'text-blue-600', bgColor = 'bg-blue-50';
+            if (goal.category === '季度目标') {
+                barColor = 'progress-bar-emerald'; textColor = 'text-emerald-600'; bgColor = 'bg-emerald-50';
+            } else if (goal.category === '月度目标') {
+                barColor = 'progress-bar-amber'; textColor = 'text-amber-600'; bgColor = 'bg-amber-50';
+            }
+
+            catElem.className = `px-2.5 py-0.5 ${bgColor} ${textColor} text-xs font-medium rounded-md`;
+            document.getElementById('targetRate').className = `text-base font-extrabold ${textColor}`;
+            document.getElementById('progressText').className = `text-xs font-bold ${textColor}`;
+            document.getElementById('progressBar').className = `${barColor} h-full rounded-full transition-all duration-700`;
+            document.getElementById('progressBar').style.width = `${goal.progress || 0}%`;
+
+            if (goal.deadline) {
+                const days = Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+                document.getElementById('timeLeftDisplay').innerText = days > 0 ? `剩余 ${days} 天` : '已结束';
+            }
+            document.getElementById('goalContent').classList.remove('opacity-0');
+        }
+
+        function handleBack() {
+            const ref = document.referrer;
+            window.location.href = ref.includes('strict-merge-dashboard.html') ? 'strict-merge-dashboard.html' : '阅读目标列表页.html';
+        }
+
+        async function logout() {
+            await window.supabase.auth.signOut();
+            window.location.href = 'login.html';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

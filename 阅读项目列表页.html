@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 阅读项目管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', "Microsoft YaHei", sans-serif; background-color: #f8fafc; }
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+        .progress-bar { transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1); }
+        .tab-active { background-color: #2563eb; color: white; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+    </style>
+</head>
+<body class="flex min-h-screen text-slate-700">
+
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-house"></i>
+                <span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读目标列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye"></i>
+                <span class="text-sm font-medium">阅读目标</span>
+            </a>
+            <a href="阅读项目列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-regular fa-folder"></i>
+                <span class="text-sm font-medium">阅读项目</span>
+            </a>
+            <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="text-sm font-medium">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span class="text-sm font-medium">读书笔记</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-100 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="w-10 h-10 rounded-full bg-slate-100" alt="avatar" />
+            <div class="flex-1 overflow-hidden">
+                <div class="text-sm font-bold truncate">张明</div>
+                <div class="text-xs text-slate-400">高级阅读者</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">阅读项目管理</h1>
+                <p class="text-sm text-slate-400 mt-1">管理你的主题阅读计划与书籍清单</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="window.location.href='新增项目.html'" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-100 font-medium text-sm">
+                    <i class="fas fa-plus"></i> 新建项目
+                </button>
+            </div>
+        </header>
+
+        <div class="flex gap-2 mb-8 bg-slate-100/50 p-1 rounded-xl w-fit" id="filter-tabs">
+            <button onclick="fetchProjects('全部')" class="tab-btn tab-active px-6 py-2 rounded-lg text-sm transition-all">全部</button>
+            <button onclick="fetchProjects('进行中')" class="tab-btn px-6 py-2 text-slate-500 hover:bg-white rounded-lg text-sm transition-all">进行中</button>
+            <button onclick="fetchProjects('已完成')" class="tab-btn px-6 py-2 text-slate-500 hover:bg-white rounded-lg text-sm transition-all">已完成</button>
+        </div>
+
+        <div id="project-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="animate-pulse bg-white h-72 rounded-2xl border border-slate-100"></div>
+            <div class="animate-pulse bg-white h-72 rounded-2xl border border-slate-100"></div>
+            <div class="animate-pulse bg-white h-72 rounded-2xl border border-slate-100"></div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+
+        window.fetchProjects = async function(statusFilter = '全部') {
+            const grid = document.getElementById('project-grid');
+            updateTabUI(statusFilter);
+            
+            try {
+                let query = supabase.from('projects').select('*');
+                if (statusFilter !== '全部') {
+                    query = query.eq('status', statusFilter);
+                }
+                
+                const { data: projects, error } = await query.order('created_at', { ascending: false });
+                if (error) throw error;
+
+                if (!projects || projects.length === 0) {
+                    grid.innerHTML = `
+                        <div class="col-span-full py-24 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+                            <div class="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fa-regular fa-folder-open text-2xl"></i>
+                            </div>
+                            <p class="text-slate-400">暂无${statusFilter === '全部' ? '' : statusFilter}的项目</p>
+                        </div>`;
+                    return;
+                }
+
+                grid.innerHTML = projects.map(proj => {
+                    const statusClass = proj.status === '已完成' ? 'bg-emerald-50 text-emerald-600' : 
+                                      proj.status === '进行中' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+                    const barColor = proj.status === '已完成' ? 'bg-emerald-500' : 'bg-blue-600';
+                    
+                    return `
+                    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden card-hover shadow-sm flex flex-col group">
+                        <div class="h-32 bg-slate-100 relative overflow-hidden">
+                            <img src="${proj.cover_url || 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800'}" 
+                                 class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90" alt="cover">
+                            <div class="absolute top-3 right-3">
+                                <span class="px-2.5 py-1 ${statusClass} text-[10px] font-bold rounded-lg shadow-sm backdrop-blur-md">${proj.status}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-5 flex-1 flex flex-col">
+                            <h3 class="text-base font-bold text-slate-800 mb-2 truncate">${proj.project_name || '未命名项目'}</h3>
+                            <p class="text-slate-400 text-xs mb-6 line-clamp-2 leading-relaxed flex-1">${proj.description || '暂无描述内容'}</p>
+                            
+                            <div class="mb-5">
+                                <div class="flex justify-between text-[10px] mb-1.5">
+                                    <span class="text-slate-400 font-medium">阅读进度</span>
+                                    <span class="text-blue-600 font-bold">${proj.progress || 0}%</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                                    <div class="${barColor} h-full progress-bar" style="width: ${proj.progress || 0}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-center pt-4 border-t border-slate-50">
+                                <span class="text-[10px] text-slate-400 font-medium">
+                                    ${new Date(proj.created_at).toLocaleDateString()}
+                                </span>
+                                <a href="阅读项目详情页.html?id=${proj.id}" class="text-blue-600 text-xs font-bold flex items-center gap-1 hover:gap-2 transition-all">
+                                    进入项目 <i class="fa-solid fa-arrow-right-long"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+            } catch (err) {
+                console.error("加载失败:", err);
+                grid.innerHTML = `<div class="col-span-full p-8 text-center text-rose-500 bg-white rounded-2xl border border-rose-100">数据库同步失败</div>`;
+            }
+        }
+
+        function updateTabUI(activeStatus) {
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => {
+                if (btn.innerText === activeStatus) {
+                    btn.className = 'tab-btn tab-active px-6 py-2 rounded-lg text-sm transition-all';
+                } else {
+                    btn.className = 'tab-btn px-6 py-2 text-slate-500 hover:bg-white rounded-lg text-sm transition-all';
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => fetchProjects('全部'));
+    </script>
+</body>
+</html>

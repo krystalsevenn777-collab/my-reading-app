@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 读书笔记</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #F8FAFC;
+            color: #1E293B;
+        }
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+        .note-card:hover {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+            border-color: #3b82f633;
+        }
+        .transition-all { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body>
+    <div id="app" class="flex min-h-screen">
+        <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold">知</div>
+                <span class="text-xl font-bold text-slate-800">知阅</span>
+            </div>
+            
+            <nav class="flex-1 px-4 space-y-1">
+                <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                    <i class="fa-solid fa-house"></i>
+                    <span class="font-medium text-sm">首页仪表盘</span>
+                </a>
+                <a href="阅读目标列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                    <i class="fa-solid fa-bullseye"></i>
+                    <span class="text-sm">阅读目标</span>
+                </a>
+                <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                    <i class="fa-regular fa-folder"></i>
+                    <span class="text-sm">阅读项目</span>
+                </a>
+                <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span class="text-sm">我的书架</span>
+                </a>
+                <a href="#" @click.prevent="page = 'list'" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span class="font-medium text-sm">读书笔记</span>
+                </a>
+            </nav>
+
+            <div class="p-4 border-t border-slate-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-slate-700">张明</div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">Reading Enthusiast</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto">
+            
+            <div v-if="page === 'list'" class="p-6 md:p-10 max-w-none mx-auto">
+                <header class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900">读书笔记</h1>
+                        <p class="text-sm text-slate-400 mt-1">记录你的阅读感悟与知识沉淀</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button class="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition-all">
+                            <i class="fas fa-layer-group mr-2"></i> 批量操作
+                        </button>
+                        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center transition-all">
+                            <i class="fas fa-plus mr-2 text-xs"></i> 新建笔记
+                        </button>
+                    </div>
+                </header>
+
+                <div class="flex flex-col md:flex-row gap-4 mb-8">
+                    <div class="relative flex-1">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" placeholder="搜索笔记标题、内容或标签..." class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm">
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
+                            <i class="fas fa-filter mr-2 text-slate-400"></i> 筛选
+                        </button>
+                        <button class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">
+                            最新更新 <i class="fas fa-chevron-down ml-2 text-[10px] text-slate-400"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex space-x-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+                    <button v-for="tag in ['全部笔记', '心理学', '历史', '科技', '哲学', '经济学']" :key="tag" 
+                        :class="tag === '全部笔记' ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-200'"
+                        class="px-5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all">
+                        {{tag}}
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div v-for="note in notes" :key="note.id" @click="openDetail(note)" class="note-card bg-white p-6 rounded-2xl border border-slate-100 cursor-pointer transition-all flex gap-6">
+                        <div class="w-20 h-28 bg-slate-50 rounded-lg shadow-sm overflow-hidden flex-shrink-0 border border-slate-100">
+                            <img :src="note.cover" class="w-full h-full object-cover">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start mb-1 gap-2">
+                                <h3 class="text-base font-bold text-slate-800 hover:text-blue-600 transition-colors truncate">{{note.title}}</h3>
+                                <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap mt-1">{{note.date}}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mb-3 font-medium">{{note.author}} | {{note.category}}</p>
+                            <div class="flex flex-wrap gap-1.5 mb-4">
+                                <span v-for="tag in note.tags" :key="tag" 
+                                    :class="getTagClass(tag)"
+                                    class="px-2 py-0.5 rounded-md text-[10px] font-bold">
+                                    {{tag}}
+                                </span>
+                            </div>
+                            <p class="text-sm text-slate-500 leading-relaxed line-clamp-2">{{note.excerpt}}</p>
+                            <div class="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                                <div class="flex items-center space-x-4 text-[10px] text-slate-400">
+                                    <span><i class="far fa-sticky-note mr-1.5"></i> {{note.notesCount}} 条笔记</span>
+                                    <span><i class="far fa-file-alt mr-1.5"></i> {{note.words}} 字</span>
+                                    <span><i class="far fa-clock mr-1.5"></i> {{note.lastEdit}}</span>
+                                </div>
+                                <i class="fa-solid fa-arrow-right text-slate-200 group-hover:text-blue-500 text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-12 flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <p class="text-xs text-slate-400">
+                        共记录了 <span class="font-bold text-slate-700">{{ notes.length }}</span> 本书的 
+                        <span class="font-bold text-slate-700">{{ totalAnnotationsCount }}</span> 条笔记
+                    </p>
+                    
+                    <div class="flex space-x-1">
+                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                            <i class="fas fa-chevron-left text-[10px]"></i>
+                        </button>
+                        <button class="w-8 h-8 flex items-center justify-center bg-blue-600 text-white rounded-lg font-bold text-xs shadow-sm shadow-blue-100">1</button>
+                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                            <i class="fas fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="page === 'detail'" class="min-h-screen bg-white">
+                <header class="sticky top-0 bg-white/90 backdrop-blur-md z-10 p-4 px-8 border-b border-slate-100 flex justify-between items-center">
+                    <div class="flex items-center space-x-4">
+                        <button @click="page = 'list'" class="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
+                            <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
+                        <h2 class="text-base font-bold text-slate-800">笔记详情</h2>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50 flex items-center">
+                            <i class="fas fa-share-alt mr-2"></i> 分享
+                        </button>
+                        <button class="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium hover:bg-blue-100 flex items-center">
+                            <i class="fas fa-edit mr-2"></i> 编辑
+                        </button>
+                        <button class="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium hover:bg-rose-100 flex items-center">
+                            <i class="fas fa-trash-alt mr-2"></i> 删除
+                        </button>
+                    </div>
+                </header>
+
+                <div class="max-w-4xl mx-auto py-12 px-8">
+                    <h1 class="text-3xl font-extrabold text-slate-900 mb-6 tracking-tight leading-tight">{{activeNote.fullTitle || activeNote.title}}</h1>
+                    <div class="flex items-center space-x-6 text-[11px] text-slate-400 mb-10 pb-6 border-b border-slate-50">
+                        <span class="flex items-center"><i class="far fa-calendar-alt mr-2 text-blue-400"></i> 创建于 {{activeNote.date}}</span>
+                        <span class="flex items-center"><i class="far fa-clock mr-2 text-blue-400"></i> 更新于 {{activeNote.lastEdit}}</span>
+                        <span class="flex items-center"><i class="far fa-file-alt mr-2 text-blue-400"></i> {{activeNote.words}} 字</span>
+                    </div>
+
+                    <div class="flex items-center space-x-4 p-5 bg-slate-50/50 rounded-2xl mb-12 border border-slate-100 shadow-sm">
+                        <img :src="activeNote.cover" class="w-14 h-20 object-cover rounded shadow-md border border-white">
+                        <div>
+                            <p class="font-bold text-slate-800 text-sm mb-1">{{activeNote.title}}</p>
+                            <p class="text-xs text-slate-400">{{activeNote.author}}</p>
+                            <button @click="goToReader(activeNote.id)" class="text-blue-600 text-[10px] font-bold mt-2 hover:underline flex items-center">
+                                <i class="fa-solid fa-book-open mr-1"></i> 继续阅读本章节 →
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-8">
+                        <section v-for="(anno, index) in activeNote.fullContent" :key="index" class="border-b border-slate-50 pb-6">
+                            <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                <span class="w-1 h-4 bg-blue-500 rounded-full"></span> 笔记片段 {{index + 1}}
+                            </h3>
+                            <p class="text-slate-600 text-sm leading-relaxed">{{anno.content}}</p>
+                        </section>
+                    </div>
+
+                    <div class="prose prose-slate max-w-none text-slate-600 leading-relaxed text-sm space-y-8">
+                        <section>
+                            <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span> 核心观点总结
+                            </h3>
+                            <p>这是笔记的正文内容展示区域...</p>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+    <script type="module">
+        // 注意：这里的 type="module" 是必须的，这样才能使用 import
+        // 如果你的 supabase-config.js 也是导出 export const supabase...
+        import { supabase } from './supabase-config.js';
+    
+        const { createApp, ref, onMounted,computed } = Vue;
+    
+        createApp({
+            setup() {
+                const page = ref('list');
+                const activeNote = ref(null);
+                const notes = ref([]); 
+                const loading = ref(true);
+    
+                // 获取数据逻辑
+                const fetchData = async () => {
+                loading.value = true;
+                try {
+                    // 1. 获取所有笔记数据（这是源头）
+                    const { data: annotations, error: annoError } = await supabase
+                        .from('annotations')
+                        .select('book_id, content, created_at');
+                    
+                    if (annoError) throw annoError;
+
+                    // 2. 提取所有有笔记的书籍 ID 并去重
+                    const bookIdsWithNotes = [...new Set(annotations.map(a => a.book_id))];
+
+                    if (bookIdsWithNotes.length === 0) {
+                        notes.value = [];
+                        return;
+                    }
+
+                    // 3. 仅查询这些有笔记的书籍信息
+                    const { data: books, error: bookError } = await supabase
+                        .from('books')
+                        .select('*')
+                        .in('id', bookIdsWithNotes) // 关键过滤：仅包含在 IDs 列表中的书
+                        .order('updated_at', { ascending: false });
+
+                    if (bookError) throw bookError;
+
+                    // 4. 组装数据
+                    notes.value = books.map(book => {
+                        const bookAnnos = annotations.filter(a => a.book_id === book.id);
+                        // 计算总字数
+                        const totalWords = bookAnnos.reduce((sum, a) => sum + (a.content?.length || 0), 0);
+                        
+                        return {
+                            id: book.id,
+                            title: book.title,
+                            author: book.author || '未知作者',
+                            category: book.category || '未分类',
+                            cover: book.cover_url || 'https://via.placeholder.com/200x300?text=No+Cover',
+                            tags: book.tags || [book.category || '阅读'],
+                            // 摘要显示最新的一条笔记
+                            excerpt: bookAnnos[bookAnnos.length - 1].content, 
+                            words: totalWords.toLocaleString(),
+                            date: new Date(book.created_at).toLocaleDateString(),
+                            lastEdit: book.updated_at ? new Date(book.updated_at).toLocaleDateString() : '尚未更新',
+                            notesCount: bookAnnos.length,
+                            fullContent: bookAnnos 
+                        };
+                    });
+
+                    
+
+                } catch (err) {
+                    console.error('数据加载失败:', err);
+                } finally {
+                    loading.value = false;
+                }
+            };
+                                // 新增：计算总笔记条数
+                const totalAnnotationsCount = computed(() => {
+                        // 累加每本书里的 notesCount (我们在 fetchData 里已经算好了这个字段)
+                        return notes.value.reduce((sum, book) => sum + (book.notesCount || 0), 0);
+                    });
+                const openDetail = (note) => {
+                    activeNote.value = note;
+                    page.value = 'detail';
+                    window.scrollTo(0, 0);
+                };
+    
+                const goToReader = (bookId) => {
+                    // 确保文件名与你的阅读页文件名一致
+                    window.location.href = `阅读详情页.html?id=${bookId}`; 
+                };
+    
+                const getTagClass = (tag) => {
+                    const map = {
+                        '心理学': 'bg-purple-50 text-purple-500',
+                        '历史': 'bg-amber-50 text-amber-600',
+                        '哲学': 'bg-rose-50 text-rose-500',
+                        '科技': 'bg-blue-50 text-blue-500',
+                        '计算机': 'bg-sky-50 text-sky-500'
+                    };
+                    return map[tag] || 'bg-slate-50 text-slate-500';
+                };
+    
+                onMounted(fetchData);
+    
+                return { 
+                    page, 
+                    notes, 
+                    totalAnnotationsCount,
+                    activeNote, 
+                    loading, 
+                    openDetail, 
+                    goToReader, 
+                    getTagClass 
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

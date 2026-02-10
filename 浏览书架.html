@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 我的书架</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', "Microsoft YaHei", sans-serif; background-color: #f8fafc; }
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+        
+        /* 选中状态样式 */
+        .book-card.selected .book-cover { border: 4px solid #3b82f6; transform: scale(0.95); }
+        .book-card.selected .checkbox-wrapper { background-color: #3b82f6; border-color: #3b82f6; color: white; }
+
+        .book-cover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .book-card:not(.selected):hover .book-cover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<div id="addBookModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-[24px] w-full max-w-md p-8 shadow-2xl border border-slate-100">
+        <h2 class="text-xl font-bold text-slate-800 mb-6">导入书籍</h2>
+        <div class="space-y-4">
+            <input type="text" id="newTitle" class="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="书名">
+            <input type="text" id="newAuthor" class="w-full bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="作者 (可选)">
+            <div class="border-2 border-dashed border-slate-100 rounded-2xl p-8 text-center relative hover:bg-slate-50 transition-colors cursor-pointer">
+                <input type="file" id="fileInput" accept=".epub,.pdf,.txt" class="absolute inset-0 opacity-0 cursor-pointer">
+                <div id="fileStatus" class="text-xs text-slate-400">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl mb-3 text-blue-200"></i>
+                    <p>点击选择 EPUB, PDF 或 TXT</p>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-3 mt-8">
+            <button onclick="closeModal()" class="flex-1 py-3 text-sm font-bold text-slate-400 hover:bg-slate-50 rounded-xl">取消</button>
+            <button id="uploadBtn" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">开始解析</button>
+        </div>
+    </div>
+</div>
+<body class="flex min-h-screen text-slate-700">
+
+    <!-- 侧边导航栏 -->
+    <aside id="sidebar" class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-house text-sm"></i><span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读目标列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye text-sm"></i><span class="text-sm">阅读目标</span>
+            </a>
+            <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-regular fa-folder text-sm"></i><span class="text-sm">阅读项目</span>
+            </a>
+            <a href="浏览书架.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-solid fa-book-open text-sm"></i><span class="font-medium text-sm">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-to-square text-sm"></i><span class="text-sm">读书笔记</span>
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto" id="mainContent">
+        <div class="w-full max-w-[1600px] mx-auto p-6 md:p-10 pb-40 pt-24">
+            <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-12">
+                <div>
+                    <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight" id="pageTitle">我的书架</h1>
+                    <p class="text-slate-500 mt-2" id="pageDesc">点击书籍封面进入阅读模式</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative group">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" id="searchInput" placeholder="搜索书名..." 
+                               class="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 w-full md:w-80 shadow-sm transition-all">
+                    </div>
+                </div>
+            </header>
+
+            <div id="bookGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-8 gap-y-12">
+                <!-- 动态内容 -->
+            </div>
+        </div>
+    </main>
+
+    <!-- 导入工具栏 (仅在 mode=select 时根据选中情况显示) -->
+    <div id="batchToolbar" class="fixed bottom-0 left-0 right-0 md:left-64 bg-white border-t border-slate-200 p-5 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] transform translate-y-full z-50 transition-transform duration-300">
+        <div class="max-w-[1600px] mx-auto flex items-center justify-between px-6">
+            <div class="flex flex-col">
+                <span class="text-sm font-bold text-slate-900 leading-none">已选中 <span id="selectedCount" class="text-blue-600">0</span> 本书籍</span>
+                <button onclick="clearAllSelection()" class="text-[11px] text-slate-400 hover:text-rose-500 font-medium mt-1 transition-colors text-left">取消全部选择</button>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="window.history.back()" class="px-6 py-2.5 text-slate-600 hover:bg-slate-50 rounded-xl text-sm font-bold border border-slate-200">取消</button>
+                <button id="confirmBtn" onclick="confirmImport()" class="px-8 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all">
+                    确认导入到项目
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+    
+        let allBooks = [];
+        let selectedIds = [];
+    
+        const urlParams = new URLSearchParams(window.location.search);
+        const isSelectMode = urlParams.get('mode') === 'select';
+    
+        function initUI() {
+            if (isSelectMode) {
+                document.getElementById('pageTitle').innerText = "选择书籍";
+                document.getElementById('pageDesc').innerText = "勾选需要添加到新项目的书籍";
+            }
+        }
+    
+        async function fetchBooks() {
+            const { data, error } = await supabase.from('books').select('*').order('created_at', { ascending: false });
+            if (!error) {
+                allBooks = data;
+                renderBooks();
+            }
+        }
+    
+        function renderBooks() {
+            const grid = document.getElementById('bookGrid');
+            const booksHtml = allBooks.map(book => {
+                const isSelected = selectedIds.includes(book.id);
+                return `
+                    <div class="book-card group cursor-pointer ${isSelected ? 'selected' : ''}" onclick="handleBookClick('${book.id}')">
+                   
+                    <div class="book-cover aspect-[3/4] rounded-xl overflow-hidden shadow-lg mb-4 bg-slate-200 relative border-4 border-transparent">
+                        <img src="${book.cover_url}" class="w-full h-full object-cover">
+                        
+                        ${!isSelectMode ? `
+                            <button onclick="event.stopPropagation(); deleteBook('${book.id}')" class="absolute top-2 right-2 w-8 h-8 bg-rose-500/80 hover:bg-rose-600 text-white rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 z-10">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        ` : ''}
+
+                        ${isSelectMode ? `
+                            <div class="checkbox-wrapper absolute top-3 right-3 w-6 h-6 rounded-full border-2 border-white/50 bg-black/20 flex items-center justify-center">
+                                <i class="fa-solid fa-check text-[10px] ${isSelected ? 'block' : 'hidden'}"></i>
+                            </div>
+                        ` : `
+                            <div class="absolute inset-0 bg-blue-900/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span class="bg-white/90 text-blue-600 px-4 py-2 rounded-full text-xs font-bold shadow-lg">进入阅读</span>
+                            </div>
+                        `}
+                    </div>
+                        <div class="px-1 text-center lg:text-left">
+                            <h4 class="font-bold text-slate-900 text-sm line-clamp-1">${book.title}</h4>
+                            <p class="text-[11px] text-slate-400 mt-1">${book.author || '未知作者'}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+    
+            const addBtnHtml = `
+                <div onclick="showAddModal()" class="border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-blue-300 hover:text-blue-500 transition-all aspect-[3/4] cursor-pointer group">
+                    <div class="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center mb-2 group-hover:bg-blue-50 transition-colors">
+                        <i class="fa-solid fa-plus text-lg"></i>
+                    </div>
+                    <span class="text-xs font-bold">添加新书</span>
+                </div>
+            `;
+            grid.innerHTML = booksHtml + addBtnHtml;
+        }
+        
+    
+        // --- 交互逻辑 ---
+        window.handleBookClick = function(id) {
+            if (isSelectMode) {
+                const index = selectedIds.indexOf(id);
+                if (index > -1) selectedIds.splice(index, 1);
+                else selectedIds.push(id);
+                renderBooks();
+                updateToolbar();
+            } else {
+                window.location.href = `阅读详情页.html?id=${id}`;
+            }
+        };
+    
+        function updateToolbar() {
+            const toolbar = document.getElementById('batchToolbar');
+            document.getElementById('selectedCount').innerText = selectedIds.length;
+            if (selectedIds.length > 0) toolbar.classList.remove('translate-y-full');
+            else toolbar.classList.add('translate-y-full');
+        }
+    
+        window.clearAllSelection = () => {
+            selectedIds = [];
+            renderBooks();
+            updateToolbar();
+        };
+    
+        window.confirmImport = () => {
+            const selectedData = allBooks.filter(b => selectedIds.includes(b.id));
+            localStorage.setItem('temp_selected_books', JSON.stringify(selectedData));
+            window.location.href = '新增项目.html';
+        };
+    
+        // --- 导入功能逻辑 ---
+        window.showAddModal = () => document.getElementById('addBookModal').classList.remove('hidden');
+        window.closeModal = () => document.getElementById('addBookModal').classList.add('hidden');
+    
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileStatus').innerHTML = `<p class="text-blue-600 font-bold">${file.name}</p>`;
+                document.getElementById('newTitle').value = file.name.replace(/\.[^/.]+$/, "");
+            }
+        });
+    
+        // 解析 PDF 函数
+        // 替换原有的 parsePDF 函数
+        async function parsePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let pages = [];
+            
+            // 全局变量，用来暂存封面
+            window.currentPdfCover = null; 
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                
+                // --- 提高清晰度：scale 设为 2.5 (高清与体积的平衡) ---
+                const viewport = page.getViewport({ scale: 2.5 }); 
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                // 提高图片质量到 0.9
+                const imgData = canvas.toDataURL('image/jpeg', 0.9);
+                
+                // --- 提取封面逻辑：如果是第一页，额外生成一个小尺寸封面 ---
+                if (i === 1) {
+                    const thumbViewport = page.getViewport({ scale: 0.5 }); // 封面不需要那么大，0.5 足够
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = thumbViewport.width;
+                    thumbCanvas.height = thumbViewport.height;
+                    const thumbCtx = thumbCanvas.getContext('2d');
+                    await page.render({ canvasContext: thumbCtx, viewport: thumbViewport }).promise;
+                    window.currentPdfCover = thumbCanvas.toDataURL('image/jpeg', 0.6); // 降低封面体积
+                }
+
+                const pageHtml = `<div class="pdf-page-container"><img src="${imgData}" style="width:100%; height:auto;"></div>`;
+                pages.push(pageHtml);
+            }
+            return pages;
+        }
+        
+    
+        // 解析 TXT 函数
+        async function parseTXT(file) {
+            const text = await file.text();
+            const chunkSize = 1500; // 每页字数
+            let pages = [];
+            for (let i = 0; i < text.length; i += chunkSize) {
+                pages.push(text.substring(i, i + chunkSize));
+            }
+            return pages;
+        }
+        // 新增：EPUB 解析函数
+        async function parseEPUB(file) {
+            const reader = new FileReader();
+            return new Promise((resolve, reject) => {
+                reader.onload = async (e) => {
+                    try {
+                        const book = ePub(e.target.result);
+                        await book.ready;
+                        // 尝试提取封面图 URL
+                        const coverUrl = await book.coverUrl();
+                        if (coverUrl) {
+                            // 如果找到了封面，把它临时存起来，稍后存入数据库
+                            window.currentEpubCover = coverUrl;
+                        }
+                        // 获取书籍的所有章节
+                        const spine = book.spine;
+                        let pages = [];
+
+                        // 遍历每一个章节进行抓取
+                        for (const item of spine.items) {
+                            const doc = await item.load(book.load.bind(book));
+                            // 提取章节里的纯文字（去掉HTML标签，防止样式冲突）
+                            const text = doc.body.innerText || doc.body.textContent;
+                            
+                            if (text && text.trim().length > 20) {
+                                // 如果章节很长，再按 1500 字切一下，防止页面太长
+                                const chunkSize = 1500;
+                                for (let i = 0; i < text.length; i += chunkSize) {
+                                    pages.push(text.substring(i, i + chunkSize));
+                                }
+                            }
+                            item.unload();
+                        }
+                        resolve(pages);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+    
+        // 上传核心逻辑
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            const title = document.getElementById('newTitle').value.trim();
+            const author = document.getElementById('newAuthor').value.trim() || '佚名';
+            const file = document.getElementById('fileInput').files[0];
+            
+            if (!title || !file) return alert("请完整填写信息");
+            
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true; btn.innerText = "正在解析并存入数据库...";
+    
+            try {
+                const bookId = 'book_' + Date.now();
+                let pagesData = [];
+                const ext = file.name.split('.').pop().toLowerCase();
+    
+                // 1. 根据类型解析内容
+                // 1. 根据类型解析内容
+                if (ext === 'pdf') {
+                    pagesData = await parsePDF(file);
+                } else if (ext === 'txt') {
+                    pagesData = await parseTXT(file);
+                } else if (ext === 'epub') {
+                    // 新增：识别 epub 后缀
+                    pagesData = await parseEPUB(file);
+                } else {
+                    throw new Error("目前支持 PDF, TXT 和 EPUB 格式");
+                }
+    
+                // 2. 存入书籍主表
+                const { error: err1 } = await supabase.from('books').insert([{
+                    id: bookId,
+                    title: title,
+                    author: author,
+                    total_pages: pagesData.length,
+                    cover_url: window.currentPdfCover || 'https://images.unsplash.com/photo-1543005139-059e15147552?w=400' 
+                }]);
+                if (err1) throw err1;
+    
+                // 3. 分批存入内容表 (核心：确保 page_number 是数字)
+                for (let i = 0; i < pagesData.length; i += 50) {
+                    const batch = pagesData.slice(i, i + 50).map((text, index) => ({
+                        book_id: bookId,
+                        page_number: Number(i + index + 1), // 强制转换为整数数字
+                        content: text
+                    }));
+                    const { error: err2 } = await supabase.from('book_contents').insert(batch);
+                    if (err2) throw err2;
+                }
+    
+                alert(`成功导入！共 ${pagesData.length} 页`);
+                location.reload();
+            } catch (err) {
+                console.error(err);
+                alert("导入失败: " + err.message);
+            } finally {
+                btn.disabled = false; btn.innerText = "开始解析";
+            }
+        });
+    
+        initUI();
+        fetchBooks();
+                window.deleteBook = async function(id) {
+            if (!confirm('确定要删除这本书及其所有阅读内容吗？此操作不可撤销。')) return;
+            
+            try {
+                // 1. 删除内容表里的数据
+                await supabase.from('book_contents').delete().eq('book_id', id);
+                // 2. 删除书籍主表里的数据
+                await supabase.from('books').delete().eq('id', id);
+                
+                alert('删除成功');
+                fetchBooks(); // 刷新列表
+            } catch (err) {
+                alert('删除失败：' + err.message);
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 阅读目标管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+        window.supabase = supabase;
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', "Microsoft YaHei", sans-serif; background-color: #f8fafc; }
+        /* 统一侧边栏激活色 */
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; font-weight: 600; }
+        /* Tab 激活样式 */
+        .tab-active { background-color: #3b82f6 !important; color: white !important; border-color: #3b82f6 !important; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="flex min-h-screen text-slate-700">
+
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-house text-sm"></i>
+                <span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读目标列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye text-sm"></i>
+                <span class="font-medium text-sm">阅读目标</span>
+            </a>
+            <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-regular fa-folder text-sm"></i>
+                <span class="text-sm">阅读项目</span>
+            </a>
+            <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-book-open text-sm"></i>
+                <span class="text-sm">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-to-square text-sm"></i>
+                <span class="text-sm">读书笔记</span>
+            </a>
+        </nav>
+        <div class="p-4 border-t border-slate-100 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="w-10 h-10 rounded-full bg-slate-100" alt="avatar">
+            <div class="flex-1 overflow-hidden">
+                <div class="text-sm font-bold truncate" id="userNameDisplay">加载中...</div>
+                <div class="text-[10px] text-slate-400">阅读爱好者</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">阅读目标管理</h1>
+                <p class="text-sm text-slate-400 mt-1">设置和管理你的阅读挑战，量化阅读成果</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative group">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm transition-colors group-focus-within:text-blue-500"></i>
+                    <input type="text" placeholder="快速搜索目标..." 
+                           class="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 w-full md:w-64 transition-all shadow-sm">
+                </div>
+                <button onclick="window.location.href='新增阅读目标.html'" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-100 active:scale-95 whitespace-nowrap">
+                    <i class="fa-solid fa-plus text-xs"></i> 新建目标
+                </button>
+            </div>
+        </header>
+
+        <div class="flex items-center gap-2 mb-8 overflow-x-auto hide-scrollbar pb-1">
+            <button onclick="filterGoals('全部', this)" class="tab-btn tab-active px-6 py-2 rounded-xl border border-transparent text-sm font-bold transition-all shadow-sm">全部</button>
+            <button onclick="filterGoals('年度目标', this)" class="tab-btn px-6 py-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">年度</button>
+            <button onclick="filterGoals('季度目标', this)" class="tab-btn px-6 py-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">季度</button>
+            <button onclick="filterGoals('月度目标', this)" class="tab-btn px-6 py-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-sm font-medium hover:bg-slate-50 transition-all shadow-sm">月度</button>
+        </div>
+
+        <div id="goalsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="col-span-full py-20 text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-blue-500 text-2xl mb-4"></i>
+                <p class="text-slate-400 text-sm italic">正在获取你的阅读目标...</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    let allGoals = [];
+
+    async function fetchAndRenderGoals() {
+        const listContainer = document.getElementById('goalsList');
+        try {
+            const { data: { user } } = await window.supabase.auth.getUser();
+            if (!user) return window.location.href = 'login.html';
+            document.getElementById('userNameDisplay').innerText = user.email.split('@')[0];
+
+            const { data: goals, error } = await window.supabase
+                .from('goals')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            allGoals = goals;
+            renderList(allGoals);
+
+        } catch (err) {
+            listContainer.innerHTML = '<div class="col-span-full text-center py-10 text-rose-500 bg-rose-50 rounded-2xl border border-rose-100">数据加载失败，请检查数据库设置</div>';
+        }
+    }
+
+    function renderList(data) {
+        const listContainer = document.getElementById('goalsList');
+        if (!data || data.length === 0) {
+            listContainer.innerHTML = '<div class="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200 text-slate-400">尚未创建此类目标，开启你的第一个阅读挑战吧！</div>';
+            return;
+        }
+
+        listContainer.innerHTML = data.map(goal => {
+            const barColor = goal.category === '年度目标' ? 'bg-blue-500' : (goal.category === '季度目标' ? 'bg-emerald-500' : 'bg-amber-500');
+            const textColor = goal.category === '年度目标' ? 'text-blue-600' : (goal.category === '季度目标' ? 'text-emerald-600' : 'text-amber-600');
+            const bgColor = goal.category === '年度目标' ? 'bg-blue-50' : (goal.category === '季度目标' ? 'bg-emerald-50' : 'bg-amber-50');
+
+            return `
+            <div class="bg-white rounded-2xl border border-slate-100 shadow-sm transition-all hover:shadow-xl hover:border-blue-100 hover:-translate-y-1 group flex flex-col">
+                <div class="p-6 flex-1">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="px-3 py-1 ${bgColor} ${textColor} text-[10px] font-bold rounded-lg uppercase tracking-wider">${goal.category}</span>
+                        <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><i class="fa-solid fa-pen text-xs"></i></button>
+                            <button onclick="deleteGoal('${goal.id}')" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 line-clamp-1">${goal.title}</h3>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100/50">
+                            <p class="text-[10px] text-slate-400 mb-1 font-medium">目标数量</p>
+                            <p class="text-sm font-bold text-slate-700">${goal.book_count || 0} 本</p>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100/50">
+                            <p class="text-[10px] text-slate-400 mb-1 font-medium">截止日期</p>
+                            <p class="text-sm font-bold text-slate-700">${goal.deadline ? goal.deadline.split('-').slice(1).join('/') : '长期'}</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 mb-6">
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-[10px] font-bold text-slate-400">当前进度</span>
+                            <span class="text-xs font-black ${textColor}">${goal.progress || 0}%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-50">
+                            <div class="${barColor} h-full rounded-full transition-all duration-1000" style="width: ${goal.progress || 0}%"></div>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-500 leading-relaxed line-clamp-2 mb-4 italic">
+                        ${goal.description || '书山有路勤为径，该目标暂无备注信息。'}
+                    </p>
+                </div>
+
+                <div class="px-6 py-4 bg-slate-50/50 border-t border-slate-100 rounded-b-2xl flex items-center justify-between">
+                    <div class="flex items-center gap-1.5 overflow-hidden">
+                        <i class="fa-solid fa-folder-open text-[10px] text-slate-400 shrink-0"></i>
+                        <span class="text-[10px] text-slate-500 truncate font-medium">${goal.project_name || '未关联项目'}</span>
+                    </div>
+                    <button onclick="window.location.href='阅读目标详情页.html?id=${goal.id}'" 
+                            class="text-blue-600 text-xs font-bold hover:text-blue-700 flex items-center gap-1 shrink-0">
+                        分析 <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    window.filterGoals = function(category, btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('tab-active');
+            btn.classList.add('border-slate-200', 'bg-white', 'text-slate-500');
+        });
+        btnElement.classList.add('tab-active');
+        btnElement.classList.remove('border-slate-200', 'bg-white', 'text-slate-500');
+
+        if (category === '全部') {
+            renderList(allGoals);
+        } else {
+            const filtered = allGoals.filter(g => g.category === category);
+            renderList(filtered);
+        }
+    }
+
+    async function deleteGoal(id) {
+        if (!confirm('确定删除此目标吗？删除后不可恢复。')) return;
+        const { error } = await window.supabase.from('goals').delete().eq('id', id);
+        if (!error) fetchAndRenderGoals();
+    }
+
+    window.onload = fetchAndRenderGoals;
+</script>
+</body>
+</html>

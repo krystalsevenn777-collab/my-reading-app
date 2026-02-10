@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知阅 - 新增阅读目标</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script type="module">
+        import { supabase } from './supabase-config.js';
+        window.supabase = supabase;
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', "Microsoft YaHei", sans-serif; background-color: #f8fafc; }
+        /* 统一的侧边栏激活样式 */
+        .sidebar-active { background-color: #ebf5ff; border-right: 4px solid #3b82f6; color: #1e40af; }
+        .type-btn-active { background-color: #2563eb !important; border-color: #2563eb !important; color: white !important; }
+    </style>
+</head>
+<body class="flex min-h-screen text-slate-700">
+
+    <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col sticky top-0 h-screen shrink-0">
+        <div class="p-6 flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-lg">知</div>
+            <span class="text-xl font-bold text-slate-800">知阅</span>
+        </div>
+        
+        <nav class="flex-1 px-4 space-y-1">
+            <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-house"></i>
+                <span class="font-medium text-sm">首页仪表盘</span>
+            </a>
+            <a href="阅读项目列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-layer-group"></i>
+                <span class="font-medium text-sm">阅读项目</span>
+            </a>
+            <a href="阅读目标列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
+                <i class="fa-solid fa-bullseye"></i>
+                <span class="font-medium text-sm">阅读目标</span>
+            </a>
+            <a href="浏览书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-book"></i>
+                <span class="font-medium text-sm">我的书架</span>
+            </a>
+            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
+                <i class="fa-solid fa-pen-nib"></i>
+                <span class="font-medium text-sm">读书笔记</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-100 flex items-center gap-3">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="w-10 h-10 rounded-full bg-slate-100" alt="avatar" />
+            <div class="flex-1 overflow-hidden">
+                <div class="text-sm font-bold truncate" id="userName">加载中...</div>
+                <button onclick="logout()" class="text-[10px] text-slate-400 hover:text-rose-500 font-medium">退出登录</button>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        
+        <header class="flex items-center gap-4 mb-8">
+            <a href="阅读目标列表页.html" 
+               class="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm transition-all shadow-sm">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">新增阅读目标</h1>
+                <p class="text-sm text-slate-400 mt-1">设定一个新的阅读挑战，管理你的进步</p>
+            </div>
+        </header>
+
+        <div class="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm max-w-4xl space-y-8">
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-slate-700">目标名称 <span class="text-rose-500">*</span></label>
+                    <input type="text" id="goalTitle" placeholder="例如：2024年度阅读挑战" 
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 outline-none transition-all">
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-slate-700">目标类型</label>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="selectCategory(this)" class="type-btn px-6 py-2.5 rounded-xl text-xs font-bold border type-btn-active">年度目标</button>
+                        <button onclick="selectCategory(this)" class="type-btn px-6 py-2.5 rounded-xl text-xs font-bold border bg-white border-slate-200 text-slate-500 hover:bg-slate-50">季度目标</button>
+                        <button onclick="selectCategory(this)" class="type-btn px-6 py-2.5 rounded-xl text-xs font-bold border bg-white border-slate-200 text-slate-500 hover:bg-slate-50">月度目标</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-bold text-slate-700">目标书籍数量</label>
+                        <input type="number" id="bookCount" value="10" 
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 outline-none transition-all">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-bold text-slate-700">截止日期</label>
+                        <input type="date" id="deadline" 
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-2 relative">
+                    <label class="text-sm font-bold text-slate-700">关联项目</label>
+                    <button type="button" id="projectBtn" 
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl flex items-center justify-between text-slate-500 bg-white hover:bg-slate-50 transition-all">
+                        <span id="projName"><i class="fa-solid fa-book-open mr-2 opacity-50"></i> 选择项目</span>
+                        <i id="arrow" class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>
+                    </button>
+                    <div id="projMenu" class="hidden absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 shadow-xl rounded-2xl z-20 max-h-60 overflow-y-auto">
+                        <div id="projList" class="py-1">
+                            <div class="px-4 py-3 text-sm text-slate-400 italic">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-sm font-bold text-slate-700">目标描述</label>
+                    <textarea id="description" rows="3" placeholder="写下计划细节，如：主要涉及哪些领域的书籍..." 
+                              class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 outline-none resize-none transition-all"></textarea>
+                </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-100 flex gap-4">
+                <a href="阅读目标列表页.html" class="flex-1 py-3.5 bg-slate-50 text-slate-500 font-bold rounded-xl text-center hover:bg-slate-100 transition-all">取消</a>
+                <button onclick="saveGoal()" class="flex-1 py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-[0.98] transition-all text-center">保存目标挑战</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let selectedCategory = "年度目标";
+        let selectedProject = "";
+    
+        async function checkUser() {
+            try {
+                const { data: { user }, error } = await window.supabase.auth.getUser();
+                if (error || !user) {
+                    window.location.href = 'login.html';
+                    return null;
+                }
+                const userNameElem = document.getElementById('userName');
+                if (userNameElem) {
+                    userNameElem.innerText = user.email.split('@')[0];
+                }
+                return user;
+            } catch (err) {
+                console.error("CheckUser Error:", err);
+                return null;
+            }
+        }
+    
+        window.onload = async () => {
+            const user = await checkUser();
+            if (user) {
+                await fetchProjects(); 
+            }
+        };
+    
+        async function fetchProjects() {
+            const projList = document.getElementById('projList');
+            try {
+                const { data: { user } } = await window.supabase.auth.getUser();
+                const { data: projects, error } = await window.supabase
+                    .from('projects') 
+                    .select('project_name') 
+                    .eq('user_id', user.id);
+    
+                if (error) throw error;
+    
+                if (!projects || projects.length === 0) {
+                    projList.innerHTML = `<div class="px-4 py-3 text-sm text-slate-400 italic text-center">暂无可用项目</div>`;
+                    return;
+                }
+    
+                projList.innerHTML = projects.map(p => `
+                    <button type="button" onclick="pickProj('${p.project_name}')" 
+                        class="w-full px-4 py-3 hover:bg-blue-50 text-left text-sm text-slate-700 transition-colors flex items-center gap-2">
+                        <i class="fa-regular fa-folder text-blue-400"></i> ${p.project_name}
+                    </button>
+                `).join('');
+            } catch (err) {
+                projList.innerHTML = `<div class="px-4 py-3 text-sm text-rose-400 text-center">加载失败</div>`;
+            }
+        }
+    
+        function selectCategory(btn) {
+            document.querySelectorAll('.type-btn').forEach(b => {
+                b.classList.remove('type-btn-active');
+                b.classList.add('bg-white', 'border-slate-200', 'text-slate-500');
+            });
+            btn.classList.add('type-btn-active');
+            btn.classList.remove('bg-white', 'border-slate-200', 'text-slate-500');
+            selectedCategory = btn.innerText;
+        }
+    
+        function pickProj(name) {
+            selectedProject = name;
+            document.getElementById('projName').innerHTML = `
+                <i class="fa-solid fa-folder-open mr-2 text-blue-500"></i> 
+                <span class="text-slate-800 font-medium">${name}</span>
+            `;
+            closeMenu();
+        }
+    
+        const projBtn = document.getElementById('projectBtn');
+        const projMenu = document.getElementById('projMenu');
+        const arrow = document.getElementById('arrow');
+    
+        projBtn.onclick = (e) => {
+            e.stopPropagation();
+            projMenu.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-180');
+        };
+    
+        function closeMenu() {
+            projMenu.classList.add('hidden');
+            arrow.classList.remove('rotate-180');
+        }
+    
+        document.addEventListener('click', closeMenu);
+        projMenu.onclick = (e) => e.stopPropagation();
+    
+        async function saveGoal() {
+            const title = document.getElementById('goalTitle').value;
+            if (!title) return alert("请输入目标名称");
+    
+            try {
+                const { data: { user } } = await window.supabase.auth.getUser();
+                const { error } = await window.supabase.from('goals').insert([{
+                    title: title,
+                    category: selectedCategory,
+                    deadline: document.getElementById('deadline').value || null,
+                    user_id: user.id,
+                    project_name: selectedProject,
+                    book_count: parseInt(document.getElementById('bookCount').value) || 0,
+                    description: document.getElementById('description').value,
+                    progress: 0,
+                    status: '进行中'
+                }]);
+    
+                if (error) throw error;
+                alert("目标创建成功！");
+                window.location.href = '阅读目标列表页.html';
+            } catch (err) {
+                alert("保存失败：" + err.message);
+            }
+        }
+    
+        async function logout() {
+            await window.supabase.auth.signOut();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
