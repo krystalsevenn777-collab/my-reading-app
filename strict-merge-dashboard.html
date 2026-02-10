@@ -143,9 +143,9 @@ async function init() {
 
         // 2. 并行加载各个模块
         await Promise.all([
-            loadLastReadBook(),
-            loadGoals(),
-            loadRecentNotes()
+            loadLastReadBook(user.id),
+            loadGoals(user.id),
+            loadRecentNotes(user.id)
         ]);
     } catch (err) {
         console.error("初始化页面失败:", err);
@@ -157,6 +157,7 @@ async function loadLastReadBook() {
     const { data: books, error } = await window.supabase
         .from('books')
         .select('*')
+        .eq('user_id',user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
 
