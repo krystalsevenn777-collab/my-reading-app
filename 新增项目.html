@@ -24,19 +24,10 @@
             <a href="strict-merge-dashboard.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
                 <i class="fa-solid fa-house w-5"></i><span class="text-sm">首页仪表盘</span>
             </a>
-            <a href="阅读目标列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
-                <i class="fa-solid fa-bullseye w-5"></i><span class="text-sm">阅读目标</span>
-            </a>
             <a href="阅读项目列表页.html" class="sidebar-active flex items-center gap-3 px-4 py-3 rounded-md transition-all">
                 <i class="fa-regular fa-folder w-5"></i><span class="font-medium text-sm">阅读项目</span>
             </a>
-            <a href="我的书架.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
-                <i class="fa-solid fa-book-open w-5"></i><span class="text-sm">我的书架</span>
-            </a>
-            <a href="读书笔记列表页.html" class="flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-md transition-all">
-                <i class="fa-solid fa-pen-to-square w-5"></i><span class="text-sm">读书笔记</span>
-            </a>
-        </nav>
+            </nav>
     </aside>
 
     <main class="flex-1 overflow-y-auto">
@@ -72,11 +63,6 @@
 
                     <div class="space-y-3">
                         <label class="text-sm font-bold text-slate-700">关联书籍</label>
-                        <div class="relative mb-4">
-                            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                            <input type="text" placeholder="搜索并添加书籍到此项目..." class="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl bg-slate-50/50">
-                        </div>
-                        
                         <div id="selectedBooks" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button onclick="window.location.href='浏览书架.html?mode=select'" class="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-100 rounded-xl text-slate-300 hover:border-blue-200 hover:text-blue-400 transition-all text-sm font-medium">
                                 <i class="fa-solid fa-plus"></i> 浏览书架
@@ -100,18 +86,18 @@
 
     <script type="module">
         import { supabase } from './supabase-config.js';
-        window.supabase = supabase; // 暴露给全局函数使用
+        window.supabase = supabase; // 暴露给全局以支持 onclick 调用
 
         let selectedColorName = 'blue';
 
-        // 颜色选择
+        // 全局颜色选择函数
         window.selectColor = function(btn) {
             document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('color-btn-active'));
             btn.classList.add('color-btn-active');
             selectedColorName = btn.getAttribute('data-color');
         };
 
-        // 移除书籍
+        // 全局移除书籍函数
         window.removeBook = function(bookId) {
             const el = document.querySelector(`[data-book-id="${bookId}"]`);
             if (el) {
@@ -120,7 +106,7 @@
             }
         };
 
-        // --- 自动接收从“浏览书架”导入的书籍 ---
+        // 加载选中的书籍
         document.addEventListener('DOMContentLoaded', () => {
             const rawData = localStorage.getItem('temp_selected_books');
             if (rawData) {
@@ -129,8 +115,6 @@
                 const addBtn = container.querySelector('button'); 
 
                 importedBooks.forEach(book => {
-                    if (document.querySelector(`[data-book-id="${book.id}"]`)) return;
-
                     const html = `
                         <div class="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl shadow-sm group transition-all" data-book-id="${book.id}">
                             <div class="w-10 h-14 bg-slate-200 rounded shadow-sm overflow-hidden flex-shrink-0">
@@ -150,41 +134,37 @@
             }
         });
 
-        // 核心提交逻辑
+        // --- 核心提交函数 ---
         window.createAndReturn = async function() {
-            // 1. 获取输入值
-            const project_name = document.getElementById('projectTitle').value.trim();
-            const description = document.getElementById('projectDesc').value.trim();
             const submitBtn = document.getElementById('submitBtn');
+            const titleInput = document.getElementById('projectTitle');
+            const descInput = document.getElementById('projectDesc');
+
+            // 1. 获取输入值
+            const project_name = titleInput.value.trim();
+            const description = descInput.value.trim();
 
             if (!project_name) {
                 alert('项目名称是必填的哦');
                 return;
             }
 
-            // 2. 获取当前用户
-            const { data: { user }, error: authError } = await window.supabase.auth.getUser();
-            if (authError || !user) {
-                alert("登录状态已失效，请重新登录");
-                window.location.href = 'login.html';
-                return;
-            }
-
-            // 禁用按钮
-            submitBtn.disabled = true;
-            submitBtn.innerText = "保存中...";
-
-            // 3. 抓取书籍数据
-            const bookEls = document.querySelectorAll('#selectedBooks [data-book-id]');
-            const booksData = Array.from(bookEls).map(el => ({
-                id: el.getAttribute('data-book-id'),
-                title: el.querySelector('p.font-bold').innerText,
-                author: el.querySelector('p.text-slate-400').innerText,
-                cover_url: el.querySelector('img').src
-            }));
-
             try {
-                // 4. 插入项目
+                // 2. 获取当前用户（这是修复 ReferenceError 的关键处）
+                const { data: authData, error: authError } = await window.supabase.auth.getUser();
+                const user = authData?.user; // 明确定义 user 变量
+
+                if (authError || !user) {
+                    alert("登录状态已失效，请重新登录");
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                // 3. 准备 UI 状态
+                submitBtn.disabled = true;
+                submitBtn.innerText = "正在保存...";
+
+                // 4. 插入项目记录
                 const { data: pData, error: pErr } = await window.supabase
                     .from('projects')
                     .insert([{
@@ -192,34 +172,37 @@
                         description: description,
                         status: '进行中',
                         cover_url: `https://via.placeholder.com/150/${selectedColorName}`,
-                        user_id: user.id
+                        user_id: user.id // 现在 user 已经安全定义了
                     }])
                     .select();
 
                 if (pErr) throw pErr;
-                const newProjectId = pData[0].id;
 
-                // 5. 处理书籍关联
-                if (booksData.length > 0) {
-                    // 存入书籍库 (使用 upsert 防止重复)
-                    const { error: bErr } = await window.supabase.from('books').upsert(booksData);
-                    if (bErr) throw bErr;
+                // 5. 处理书籍关联（如果有）
+                const bookEls = document.querySelectorAll('#selectedBooks [data-book-id]');
+                if (bookEls.length > 0) {
+                    const booksData = Array.from(bookEls).map(el => ({
+                        id: el.getAttribute('data-book-id'),
+                        title: el.querySelector('p.font-bold').innerText,
+                        author: el.querySelector('p.text-slate-400').innerText,
+                        cover_url: el.querySelector('img').src
+                    }));
 
-                    // 建立关联
+                    await window.supabase.from('books').upsert(booksData);
+                    
                     const relations = booksData.map(b => ({
-                        project_id: newProjectId,
+                        project_id: pData[0].id,
                         book_id: b.id
                     }));
-                    const { error: rErr } = await window.supabase.from('project_books').insert(relations);
-                    if (rErr) throw rErr;
+                    await window.supabase.from('project_books').insert(relations);
                 }
 
                 showToast('项目创建成功！');
                 setTimeout(() => window.location.href = '阅读项目列表页.html', 1000);
 
             } catch (err) {
-                console.error(err);
-                alert('保存失败: ' + err.message);
+                console.error("保存失败详情:", err);
+                alert('保存失败: ' + (err.message || '未知错误'));
                 submitBtn.disabled = false;
                 submitBtn.innerText = "创建并返回";
             }
