@@ -228,18 +228,28 @@
     
         // 解析 PDF 函数
         // 替换原有的 parsePDF 函数
-        async function parsePDF(file) {
+        // 修改后的 parsePDF，增加上传功能
+        async function parsePDF(file, bookId) {
+            // --- 新增：上传原文件到 Storage ---
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${bookId}_raw.${fileExt}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('book-files') // 👈 请确保在 Supabase Storage 创建了名为 book-files 的公开桶
+                .upload(fileName, file);
+            
+            if (!uploadError) {
+                const { data: { publicUrl } } = supabase.storage.from('book-files').getPublicUrl(fileName);
+                window.currentFileUrl = publicUrl; // 暂存文件链接
+            }
+
+            // --- 原有的解析图片逻辑保持不变 ---
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let pages = [];
-            
-            // 全局变量，用来暂存封面
             window.currentPdfCover = null; 
 
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
-                
-                // --- 提高清晰度：scale 设为 2.5 (高清与体积的平衡) ---
                 const viewport = page.getViewport({ scale: 2.5 }); 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
@@ -247,18 +257,16 @@
                 canvas.width = viewport.width;
 
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
-                // 提高图片质量到 0.9
                 const imgData = canvas.toDataURL('image/jpeg', 0.9);
                 
-                // --- 提取封面逻辑：如果是第一页，额外生成一个小尺寸封面 ---
                 if (i === 1) {
-                    const thumbViewport = page.getViewport({ scale: 0.5 }); // 封面不需要那么大，0.5 足够
+                    const thumbViewport = page.getViewport({ scale: 0.5 });
                     const thumbCanvas = document.createElement('canvas');
                     thumbCanvas.width = thumbViewport.width;
                     thumbCanvas.height = thumbViewport.height;
                     const thumbCtx = thumbCanvas.getContext('2d');
                     await page.render({ canvasContext: thumbCtx, viewport: thumbViewport }).promise;
-                    window.currentPdfCover = thumbCanvas.toDataURL('image/jpeg', 0.6); // 降低封面体积
+                    window.currentPdfCover = thumbCanvas.toDataURL('image/jpeg', 0.6);
                 }
 
                 const pageHtml = `<div class="pdf-page-container"><img src="${imgData}" style="width:100%; height:auto;"></div>`;
@@ -339,7 +347,7 @@
                 // 1. 根据类型解析内容
                 // 1. 根据类型解析内容
                 if (ext === 'pdf') {
-                    pagesData = await parsePDF(file);
+                    pagesData = await parsePDF(file, bookId); // 传入 bookId 用于文件命名
                 } else if (ext === 'txt') {
                     pagesData = await parseTXT(file);
                 } else if (ext === 'epub') {
@@ -355,7 +363,8 @@
                     title: title,
                     author: author,
                     total_pages: pagesData.length,
-                    cover_url: window.currentPdfCover || 'https://images.unsplash.com/photo-1543005139-059e15147552?w=400' 
+                    cover_url: window.currentPdfCover || 'https://images.unsplash.com/photo-1543005139-059e15147552?w=400' ,
+                    file_url: window.currentFileUrl
                 }]);
                 if (err1) throw err1;
     
